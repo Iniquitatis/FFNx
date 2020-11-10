@@ -30,6 +30,15 @@
 
 #include "discohash.h"
 
+const std::vector<std::string> saveLoadExts =
+	{
+		"dds",
+		"png",
+		"psd",
+		"tga",
+		"exr",
+	};
+
 void make_path(char *name)
 {
 	char *next = name;
@@ -66,21 +75,32 @@ void save_texture(void *data, uint32_t dataSize, uint32_t width, uint32_t height
 	struct stat dummy;
 	uint64_t hash;
 
-	if (is_animated)
-	{
-		BEBB4185_64(data, dataSize, 0, &hash);
+	bool fileExists = false;
 
-		_snprintf(filename, sizeof(filename), "%s/%s/%s_%02i_%llx.png", basedir, mod_path.c_str(), name, palette_index, hash);
+	for (int idx = 0; idx < saveLoadExts.size(); idx++)
+	{
+		if (is_animated)
+		{
+			BEBB4185_64(data, dataSize, 0, &hash);
+
+			_snprintf(filename, sizeof(filename), "%s/%s/%s_%02i_%llx.%s", basedir, mod_path.c_str(), name, palette_index, hash, saveLoadExts[idx].c_str());
+		}
+		else
+			_snprintf(filename, sizeof(filename), "%s/%s/%s_%02i.%s", basedir, mod_path.c_str(), name, palette_index, saveLoadExts[idx].c_str());
+
+		if (stat(filename, &dummy) == 0)
+		{
+			fileExists = true;
+			break;
+		}
 	}
-	else
-		_snprintf(filename, sizeof(filename), "%s/%s/%s_%02i.png", basedir, mod_path.c_str(), name, palette_index);
 
-	normalize_path(filename);
-
-	make_path(filename);
-
-	if (stat(filename, &dummy) != 0)
+	if (!fileExists)
 	{
+		normalize_path(filename);
+
+		make_path(filename);
+
 		if (!newRenderer.saveTexture(filename, width, height, data)) error("Save texture failed for the file [ %s ].\n", filename);
 	}
 	else
@@ -112,37 +132,29 @@ uint32_t load_texture(void* data, uint32_t dataSize, char* name, uint32_t palett
 	char filename[sizeof(basedir) + 1024]{ 0 };
 	uint64_t hash;
 
-	const std::vector<std::string> exts =
-	{
-		"dds",
-		"png",
-		"psd",
-		"tga",
-		"exr",
-	};
 	struct stat dummy;
 
 	if (is_animated) BEBB4185_64(data, dataSize, 0, &hash);
 
-	for (int idx = 0; idx < exts.size(); idx++)
+	for (int idx = 0; idx < saveLoadExts.size(); idx++)
 	{
 		if (is_animated)
 		{
-			_snprintf(filename, sizeof(filename), "%s/%s/%s_%02i_%llx.%s", basedir, mod_path.c_str(), name, palette_index, hash, exts[idx].c_str());
+			_snprintf(filename, sizeof(filename), "%s/%s/%s_%02i_%llx.%s", basedir, mod_path.c_str(), name, palette_index, hash, saveLoadExts[idx].c_str());
 
 			if (stat(filename, &dummy) != 0)
 			{
 				if (trace_all || show_missing_textures) trace("Could not find animated texture [ %s ].\n", filename);
 
-				_snprintf(filename, sizeof(filename), "%s/%s/%s_%02i.%s", basedir, mod_path.c_str(), name, palette_index, exts[idx].c_str());
+				_snprintf(filename, sizeof(filename), "%s/%s/%s_%02i.%s", basedir, mod_path.c_str(), name, palette_index, saveLoadExts[idx].c_str());
 			}
 		}
 		else
-			_snprintf(filename, sizeof(filename), "%s/%s/%s_%02i.%s", basedir, mod_path.c_str(), name, palette_index, exts[idx].c_str());
+			_snprintf(filename, sizeof(filename), "%s/%s/%s_%02i.%s", basedir, mod_path.c_str(), name, palette_index, saveLoadExts[idx].c_str());
 
 		if (stat(filename, &dummy) == 0)
 		{
-			ret = load_texture_helper(filename, width, height, exts[idx] == "png");
+			ret = load_texture_helper(filename, width, height, saveLoadExts[idx] == "png");
 
 			if (!ret && trace_all) warning("External texture [%s] found but not loaded due to memory limitations.\n", filename);
 
